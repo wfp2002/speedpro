@@ -1651,9 +1651,11 @@
                         celula.style.color = "#000000";
 
                         if (activeCell.row === linhaCel && activeCell.col === (coluna - 1)) {
-                            celula.style.border = "3px solid #ef4444";
+                            celula.style.border = "3px solid #664d73";
                             celula.style.boxShadow = "inset 0 0 8px rgba(239, 68, 68, 0.8)";
                             celula.style.fontWeight = "bold";
+                            celula.style.backgroundColor = `#664d73`;
+                            celula.style.color = "#fff";
                         }
                     }
                     container.appendChild(celula);
