@@ -1,0 +1,2118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speeduino - Live Telemetry & CRC Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d0e12;
+            color: #e1e1e6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px;
+        }
+        @media (min-width: 768px) {
+            body { padding: 24px; }
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121214;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #29292e;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #04d361;
+        }
+
+        /* Navbar */
+        .navbar {
+            width: 90%;          /* Ocupa exatamente 90% da largura da tela */
+            max-width: none;     /* Remove o limite máximo fixo antigo */
+            background-color: #121214;
+            border: 1px solid #202024;
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .pulse-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #04d361;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .brand-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.025em;
+        }
+        .brand-subtitle {
+            color: #04d361;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+
+        /* Tabs */
+        .tabs-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #090a0c;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid #202024;
+        }
+        .tab-btn {
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+        }
+        .tab-btn:hover {
+            color: #ffffff;
+        }
+        .tab-btn.active {
+            background-color: #202024;
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* Status Badge */
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background-color: #202024;
+            color: #9ca3af;
+            border: 1px solid rgba(55, 65, 81, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-badge.connected {
+            background-color: rgba(4, 211, 97, 0.1);
+            color: #34d399;
+            border-color: rgba(4, 211, 97, 0.3);
+        }
+        .status-dot-small {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #6b7280;
+        }
+        .status-badge.connected .status-dot-small {
+            background-color: #04d361;
+            animation: pulse 2s infinite;
+        }
+
+        /* Containers & Views */
+        .view-container {
+            width: 90%;          /* Ocupa exatamente 90% da largura da tela */
+            max-width: none;     /* Remove o limite máximo fixo antigo */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .dashboard-grid {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        @media (min-width: 768px) {
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (min-width: 1024px) {
+            .dashboard-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+
+        /* Cards */
+        .card {
+            background-color: #121214;
+            border: 1px solid #202024;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+        .card:hover {
+            border-color: #3f3f46;
+        }
+        .card-rpm:hover { border-color: rgba(4, 211, 97, 0.4); }
+        .card-map:hover { border-color: rgba(130, 87, 229, 0.4); }
+
+        .card-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        .card-value-big {
+            font-size: 2.25rem;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: -0.05em;
+            color: #ffffff;
+        }
+        .card-subtext {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        /* Secondary Strip */
+        .secondary-strip {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        @media (min-width: 768px) {
+            .secondary-strip { grid-template-columns: repeat(4, 1fr); }
+        }
+        .strip-card {
+            background-color: #121214;
+            border: 1px solid #202024;
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+        .strip-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .strip-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: #e5e7eb;
+            margin-top: 2px;
+        }
+
+        /* Progress bars */
+        .progress-container {
+            width: 100%;
+            background-color: #202024;
+            height: 10px;
+            border-radius: 9999px;
+            overflow: hidden;
+            border: 1px solid rgba(31, 41, 55, 0.8);
+            margin-top: 4px;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.15s ease-out;
+        }
+
+        /* Connect View & VE View Containers */
+        .panel-box {
+            width: 100%;          /* Ocupa exatamente 90% da largura da tela */
+            max-width: none;     /* Remove o limite máximo fixo antigo */
+            background-color: #121214;
+            border: 1px solid #202024;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .panel-title {
+            font-size: 1.125rem;
+            font-weight: bold;
+            color: #ffffff;
+            border-bottom: 1px solid #202024;
+            padding-bottom: 12px;
+        }
+
+        /* Form Controls */
+        .form-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .form-select {
+            background-color: #090a0c;
+            font-size: 0.875rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: #e5e7eb;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #202024;
+            outline: none;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn {
+            font-weight: bold;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-green {
+            background-color: #04d361;
+            color: #000000;
+        }
+        .btn-green:hover { background-color: #00b351; }
+        .btn-rose {
+            background-color: #f43f5e;
+            color: #ffffff;
+        }
+        .btn-rose:hover { background-color: #e11d48; }
+        .btn-purple {
+            background-color: #202024;
+            color: #c084fc;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+        }
+        .btn-purple:hover { background-color: #27272a; }
+        .btn-violet {
+            background-color: #8257e5;
+            color: #ffffff;
+        }
+        .btn-violet:hover { background-color: #6842c2; }
+
+        /* Grid VE Matrix */
+        .ve-matrix-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+            background-color: #121214;
+            border: 1px solid #202024;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+        }
+        .ve-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(16, 75px);
+            gap: 1px;
+            background-color: #202024;
+            padding: 2px;
+            border-radius: 4px;
+            border: 1px solid #202024;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+        .ve-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px;
+            text-align: center;
+            user-select: none;
+            border-radius: 5px;
+        }
+        .ve-header-cell {
+            background-color: #404040;
+            color: #000000;
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        /* Inspector Console */
+        .console-section {
+            width: 100%;
+            max-width: none;
+            background-color: #121214;
+            border: 1px solid #202024;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            margin-top: auto;
+        }
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #202024;
+        }
+        .console-title-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .console-title {
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #d1d5db;
+        }
+        .console-box {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            background-color: #090a0c;
+            border: 1px solid #1b1c20;
+            border-radius: 8px;
+            padding: 12px;
+            height: 350px;
+            overflow-y: auto;
+            line-height: 1.5;
+            color: #9ca3af;
+        }
+        
+        /* Utility badges inside cards */
+        .badge-box {
+            width: 48px;
+            height: 48px;
+            background-color: #202024;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            border: 1px solid #1f2937;
+        }
+
+        .assinatura-ecu {
+            color: #9ca3af;
+            font-size: 0.65rem;
+            padding-left: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Menu Superior de Navegação -->
+    <nav class="navbar">
+        <div class="brand-container">
+            
+            <span class="brand-title">Speed <span class="brand-subtitle">Pro</span><span id="assinatura-ecu" class="assinatura-ecu"></span>
+        </div>
+        
+        <div class="tabs-group">
+            <button onclick="switchTab('connect')" id="tabConnectBtn" class="tab-btn active">Conectar ECU</button>
+            <button onclick="switchTab('dashboard')" id="tabDashboardBtn" class="tab-btn">Dashboard</button>
+            <button onclick="switchTab('tabelaVE')" id="tabTabelaVEBtn" class="tab-btn">Tabela VE</button>
+        </div>
+
+        <div>
+            <div id="statusBadge" class="status-badge">
+                <span class="status-dot-small" id="statusDot"></span>
+                <span id="statusText">Desconectado</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ABA 1: DASHBOARD -->
+    <div id="viewDashboard" class="view-container hidden">
+        <main class="dashboard-grid">
+            
+            <!-- RPM -->
+            <div class="card card-rpm">
+                <div class="card-header">
+                    <span>Rotação Motor</span>
+                    <span style="color: #04d361;" class="mono">RPM</span>
+                </div>
+                <div style="position: relative; display: flex; justify-content: center; margin: 8px 0;">
+                    <canvas id="gaugeRPM" width="180" height="110"></canvas>
+                </div>
+                <div style="text-align: center;">
+                    <div class="card-value-big" id="valRPM">0</div>
+                    <div class="card-subtext">Limite: 8000 RPM</div>
+                </div>
+            </div>
+
+            <!-- MAP -->
+            <div class="card card-map">
+                <div class="card-header">
+                    <span>Pressão Admissão</span>
+                    <span style="color: #8257e5;" class="mono">MAP</span>
+                </div>
+                <div style="position: relative; display: flex; justify-content: center; margin: 8px 0;">
+                    <canvas id="gaugeMAP" width="180" height="110"></canvas>
+                </div>
+                <div style="text-align: center;">
+                    <div class="card-value-big" id="valMAP" style="color: #8257e5;">0</div>
+                    <div class="card-subtext">kPa Absoluto</div>
+                </div>
+            </div>
+
+            <!-- Column 1: TPS & AFR -->
+            <div style="display: grid; grid-template-rows: repeat(2, 1fr); gap: 16px;">
+                <div class="card" style="padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div>
+                            <div class="card-header" style="justify-content: flex-start;">Acelerador (TPS)</div>
+                            <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                                <span id="valTPS">0</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">%</span>
+                            </div>
+                        </div>
+                        <div class="badge-box" id="tpsBadge" style="font-size: 0.875rem; color: #d1d5db;">0%</div>
+                    </div>
+                    <div class="progress-container">
+                        <div id="tpsBar" class="progress-bar" style="background-color: #04d361; width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding: 16px; flex-direction: row; align-items: center;">
+                    <div>
+                        <div class="card-header" style="justify-content: flex-start;">WIDEBAND (LAMBDA)</div>
+                        <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #38bdf8; margin-top: 4px;">
+                            <span id="valLambda">1.00</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">λ</span>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.75rem; color: #6b7280;">Target</div>
+                        <div style="font-size: 0.875rem; font-family: 'JetBrains Mono', monospace; color: #d1d5db; font-weight: bold;" id="vallambdaTarget">14.7</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: CLT & Battery -->
+            <div style="display: grid; grid-template-rows: repeat(2, 1fr); gap: 16px;">
+                <div class="card" style="padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div>
+                            <div class="card-header" style="justify-content: flex-start;">Temp. Motor (CLT)</div>
+                            <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #f59e0b; margin-top: 4px;">
+                                <span id="valCLT">25</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">°C</span>
+                            </div>
+                        </div>
+                        <div class="badge-box" id="cltBadge" style="font-size: 0.75rem; color: #f59e0b;">COLD</div>
+                    </div>
+                    <div class="progress-container">
+                        <div id="cltBar" class="progress-bar" style="background-color: #f59e0b; width: 20%;"></div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding: 16px; flex-direction: row; align-items: center;">
+                    <div>
+                        <div class="card-header" style="justify-content: flex-start;">Tensão Bateria</div>
+                        <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #f43f5e; margin-top: 4px;">
+                            <span id="valBAT">12.6</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">V</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; padding: 4px 8px; background-color: rgba(244, 63, 94, 0.1); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 4px;">
+                        BAT
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+
+
+
+
+
+
+
+<!-- 4 Cards em Linha (Ocupando 100% da largura) -->
+    <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; margin-bottom: 24px;">
+        
+        <!-- Card 1: TPS (Acelerador) -->
+        <div class="card" style="padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div>
+                    <div class="card-header" style="justify-content: flex-start;">Acelerador (TPS)</div>
+                    <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                        <span id="valTPS">0</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">%</span>
+                    </div>
+                </div>
+                <div class="badge-box" id="tpsBadge" style="font-size: 0.875rem; color: #d1d5db;">0%</div>
+            </div>
+            <div class="progress-container">
+                <div id="tpsBar" class="progress-bar" style="background-color: #04d361; width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Card 2: WIDEBAND (Lambda) -->
+        <div class="card" style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div class="card-header" style="justify-content: flex-start;">WIDEBAND (LAMBDA)</div>
+                <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #38bdf8; margin-top: 4px;">
+                    <span id="valLambda">1.00</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">λ</span>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; color: #6b7280;">Target</div>
+                <div style="font-size: 0.875rem; font-family: 'JetBrains Mono', monospace; color: #d1d5db; font-weight: bold;" id="vallambdaTarget">14.7</div>
+            </div>
+        </div>
+
+        <!-- Card 3: MAP / Pressão -->
+        <div class="card" style="padding: 16px;">
+            <div class="card-header" style="justify-content: flex-start;">PRESSÃO (MAP)</div>
+            <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                <span id="valMAP">100</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">kPa</span>
+            </div>
+        </div>
+
+        <!-- Card 4: CLT / Temperatura -->
+        <div class="card" style="padding: 16px;">
+            <div class="card-header" style="justify-content: flex-start;">MOTOR (CLT)</div>
+            <div style="font-size: 1.875rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                <span id="valCoolant">85</span><span style="font-size: 0.875rem; font-weight: normal; color: #6b7280; margin-left: 4px;">°C</span>
+            </div>
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+    <!-- 8 Cards em uma Única Linha -->
+    <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; width: 100%; margin-bottom: 16px;">
+        
+        <!-- Card 1: Dwell -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">DWELL</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                <span id="valDwell">2.50</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">ms</span>
+            </div>
+        </div>
+
+        <!-- Card 2: VE -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">VE</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #38bdf8; margin-top: 4px;">
+                <span id="valVE">75</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">%</span>
+            </div>
+        </div>
+
+        <!-- Card 3: Pressão Óleo -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">ÓLEO</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #04d361; margin-top: 4px;">
+                <span id="valOilPressure">40</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">PSI</span>
+            </div>
+        </div>
+
+        <!-- Card 4: Pressão Combustível -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">COMBUSTÍVEL</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #f59e0b; margin-top: 4px;">
+                <span id="valFuelPressure">3.0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">BAR</span>
+            </div>
+        </div>
+
+        <!-- Card 5: VVT -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">VVT</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                <span id="valVVT">0.0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">°</span>
+            </div>
+        </div>
+
+        <!-- Card 6: Boost Target -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">ALVO BOOST</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #8257e5; margin-top: 4px;">
+                <span id="valBoostTarget">0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">kPa</span>
+            </div>
+        </div>
+
+        <!-- Card 7: Correção Bateria -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">CORR. BAT</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #f43f5e; margin-top: 4px;">
+                <span id="valBatCorrection">100</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">%</span>
+            </div>
+        </div>
+
+        <!-- Card 8: Knock -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">KNOCK</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ef4444; margin-top: 4px;">
+                <span id="valKnockCount">0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">evt</span>
+            </div>
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+
+    
+
+    <!-- 8 Cards em uma Única Linha -->
+    <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; width: 100%; margin-bottom: 16px;">
+        
+        <!-- Card 1: Dwell -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">DWELL</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                <span id="valDwell">2.50</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">ms</span>
+            </div>
+        </div>
+
+        <!-- Card 2: VE -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">VE</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #38bdf8; margin-top: 4px;">
+                <span id="valVE">75</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">%</span>
+            </div>
+        </div>
+
+        <!-- Card 3: Pressão Óleo -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">ÓLEO</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #04d361; margin-top: 4px;">
+                <span id="valOilPressure">40</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">PSI</span>
+            </div>
+        </div>
+
+        <!-- Card 4: Pressão Combustível -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">COMBUSTÍVEL</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #f59e0b; margin-top: 4px;">
+                <span id="valFuelPressure">3.0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">BAR</span>
+            </div>
+        </div>
+
+        <!-- Card 5: VVT -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">VVT</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ffffff; margin-top: 4px;">
+                <span id="valVVT">0.0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">°</span>
+            </div>
+        </div>
+
+        <!-- Card 6: Boost Target -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">ALVO BOOST</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #8257e5; margin-top: 4px;">
+                <span id="valBoostTarget">0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">kPa</span>
+            </div>
+        </div>
+
+        <!-- Card 7: Correção Bateria -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">CORR. BAT</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #f43f5e; margin-top: 4px;">
+                <span id="valBatCorrection">100</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">%</span>
+            </div>
+        </div>
+
+        <!-- Card 8: Knock -->
+        <div class="card" style="padding: 12px;">
+            <div class="card-header" style="justify-content: flex-start; font-size: 0.7rem;">KNOCK</div>
+            <div style="font-size: 1.4rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: #ef4444; margin-top: 4px;">
+                <span id="valKnockCount">0</span><span style="font-size: 0.75rem; font-weight: normal; color: #6b7280; margin-left: 2px;">evt</span>
+            </div>
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+        <!-- Secondary Telemetry Strip -->
+        <div class="secondary-strip">
+            <div class="strip-card">
+                <span class="strip-label">Avanço Ignição</span>
+                <span class="strip-val"><span id="valAdvance">10.0</span>°</span>
+            </div>
+            <div class="strip-card">
+                <span class="strip-label">Tempo Injeção (PW)</span>
+                <span class="strip-val"><span id="valPW">2.10</span> ms</span>
+            </div>
+            <div class="strip-card">
+                <span class="strip-label">Temp. Ar (IAT)</span>
+                <span class="strip-val"><span id="valIAT">22</span> °C</span>
+            </div>
+            <div class="strip-card">
+                <span class="strip-label">Taxa Amostragem</span>
+                <span class="strip-val" style="color: #04d361;"><span id="valHz">0</span> Hz</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA 2: CONECTAR ECU -->
+    <div id="viewConnect" class="view-container">
+        <div class="panel-box">
+            <h2 class="panel-title">Gerenciamento de Conexão ECU</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+    
+    <!-- Linha Superior: Baud Rate e Intervalo (50% / 50%) -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center;">
+        
+        <!-- Baud Rate -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <label class="form-label">Velocidade (Baud Rate)</label>
+            <select id="baudRate" class="form-select">
+                <option value="115200" selected>115200 Baud (Padrão)</option>
+                <option value="57600">57600 Baud</option>
+                <option value="9600">9600 Baud</option>
+            </select>
+        </div>
+
+        <!-- Novo Combobox de Intervalo (ms) -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <label class="form-label">Intervalo de update do Dashboard (ms/Hz)</label>
+            <select id="intervalRate" class="form-select" onchange="alterarIntervalo()">
+                <option value="15">15 ms (~65 Hz)</option>
+                <option value="20" selected>20 ms (~50 Hz)</option>
+                <option value="30">30 ms (~33 Hz)</option>
+                <option value="50">50 ms (~20 Hz)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Linha Inferior: Ações de Conexão -->
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+        <label class="form-label">Ações de Conexão</label>
+        <div style="display: flex; gap: 12px;">
+            <button id="btnConnect" onclick="toggleConnect()" class="btn btn-green" style="flex: 1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
+                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Conectar Serial
+            </button>
+            <button id="btnSim" onclick="toggleSimulation()" class="btn btn-purple">
+                Simular Dados
+            </button>
+        </div>
+    </div>
+
+</div>
+
+        </div>
+
+
+        <!-- Live Protocol Diagnostics & Inspector Console -->
+        <section class="console-section">
+            <div class="console-header">
+                <div class="console-title-area">
+                    <svg style="width: 16px; height: 16px; color: #04d361;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <h3 class="console-title">Inspetor de Protocolo & Stream Serial</h3>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: #9ca3af;">
+                    <span>Pacotes Processados: <strong id="cntValid" style="color: #04d361;">0</strong></span>
+                    <button onclick="clearLogs()" style="color: #6b7280; background: none; border: none; cursor: pointer; text-decoration: underline; font-size: 0.75rem;">Limpar</button>
+                </div>
+            </div>
+
+            <div id="logConsole" class="console-box">
+                <div>[INIT] Protocol Engine carregado. Aguardando conexão WebSerial...</div>
+            </div>
+        </section>
+
+
+
+    </div>
+
+    <!-- ABA 3: TABELA VE COM CURSOR ATIVO -->
+    <div id="viewTabelaVE" class="view-container hidden">
+        <div class="panel-box" style="flex-direction: row; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 style="font-size: 1rem; font-weight: bold; color: #fff;">Leitor de Tabelas (16x16 com Cursor Ativo)</h2>
+                <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 2px;">A célula ativa destaca-se em vermelho com base no RPM e MAP reais da ECU.</p>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+                <button onclick="lerPaginaCompletaAutomatica(2, 've')" id="btn-tabela-ve" class="btn btn-purple">
+                    TABELA VE
+                </button>
+                <button onclick="lerPaginaCompletaAutomatica(11, 've2')" id="btn-tabela-ve2" class="btn btn-violet">
+                    TABELA VE2
+                </button>
+                <button onclick="lerPaginaCompletaAutomatica(5, 'afr')" id="btn-tabela-afr" class="btn btn-violet">
+                    TABELA AFR
+                </button>
+                <button onclick="lerPaginaCompletaAutomatica(5, 'lambda')" id="btn-tabela-lambda" class="btn btn-violet">
+                    TABELA LAMBDA
+                </button>
+            </div>
+
+
+        </div>
+
+        <div class="ve-matrix-wrapper">
+            <div id="veGridContainer" class="ve-grid">
+                <!-- Células geradas via script -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let port = null;
+        let reader;
+        let globalWriter = null;
+        let keepReading = false;
+        let rxBuffer = new Uint8Array(0);
+        let isSimulating = false;
+        let isFetchingVE = false;
+        
+        let waitingForResponse = false;
+        let requestLoopTimer = null;
+        let responseTimeoutTimer = null;
+
+        let validPacketsCount = 0;
+        let errorPacketsCount = 0;
+        let lastPacketTime = performance.now();
+        let hzCounter = 0;
+
+        let currentRPM = 0;
+        let currentMAP = 0;
+
+        const pacote1_TS = new Uint8Array([0x00, 0x07, 0x72, 0x00, 0x30, 0x00, 0x00, 0x79, 0x00, 0xB9, 0x47, 0x64, 0x45]);
+        const TARGET_PACKET_SIZE = 128; 
+        const OFFSET_MODERNO = 3;
+        const PSI_BAR_CONVERSION = 0.0689476;
+
+        /*
+        fullPageSize
+        1. Como as poagina comecam do numero 1, para o indice bater coloquei o numero 0 no idx 0. 
+        2. Entao page 1 sera o fullPageSize[1], page 2 sera o fullPageSize[2]...etc
+        3. Pegar os valores do .INI se a ultima celular é 127 e tem 1 byte U08 = 128 bytes
+        4. Pegar os valores do .INI se a ultima celular é 272 e tem uma matriz [16] soma + 16 = 288 bytes
+        5. os valores abaixo foram copiados da variavel do speeduino na pagina de codigo pages.cpp
+        */
+        const fullPageSize = [0, 128, 288, 288, 128, 288, 128, 240, 384, 192, 192, 288, 192, 128, 288, 256];
+
+        let paginasECU = {};
+        let fullPages = {};
+        let paginaAtivaAtual = 2; 
+        let tableNameAtual = "ve";
+        let stoich = 0;
+
+        let lastConsolePrintTime = 0;
+        const CONSOLE_PRINT_INTERVAL = 5000; // 5 segundos
+
+        // Controle da taxa de atualziacao do Dashboard
+        updateDataHz = 20; // 20 da uns 50Hz a conta = 1000 / 20 = 50Hz
+
+
+        function alterarIntervalo() {
+            // Só aplica se a porta estiver aberta e a telemetria estiver ativa
+            if (globalWriter && !isSimulating && !isFetchingVE) {
+                const novoTempo = document.getElementById('intervalRate').value;
+                log(`Frequência ajustada para ${novoTempo} ms. Reiniciando loop...`, 'tx');
+                
+                // startRequestLoop já limpa o timer anterior e inicia um novo com o valor atualizado da combobox
+                startRequestLoop();
+            }
+        }
+
+        async function readPage(page, parameterOffset = null) {
+                
+                if (parameterOffset !== null && parameterOffset !== undefined) {
+                    
+                    if (fullPages[page]) {
+                        return fullPages[page][parameterOffset];
+                    } else {
+                        log(`A página ${page} nao existe!`);
+                    }
+
+                    
+                } else {
+                    log(`A página ${page} tem ${fullPages[page].length} bytes!`, 'tx');
+                    return fullPages[page] ;
+                }
+
+        }
+
+        async function getPage(page) {
+            if (!globalWriter) {
+                alert("Porta serial não conectada!");
+                return false;
+            }
+
+            let tamanhoTotal = fullPageSize[page];
+            if (!tamanhoTotal) {
+                log(`Erro: Tamanho da página ${page} não definido!`, 'err');
+                return false;
+            }
+
+            isFetchingVE = true;
+            stopRequestLoop(); // Para a telemetria
+            await new Promise(r => setTimeout(r, 100));
+            rxBuffer = new Uint8Array(0);
+
+            log(`--- LENDO CONFIGURAÇÕES DA PÁGINA ${page} (${tamanhoTotal} bytes) ---`, 'tx');
+
+            // 1. Cria o array principal da página com o tamanho total
+            fullPages[page] = new Uint8Array(tamanhoTotal);
+
+            // 2. Define o tamanho máximo seguro por bloco para não estourar a ECU (128 bytes)
+            let chunkSize = 128;
+            let offsetAtual = 0;
+
+            // 3. Loop para baixar a página em pedaços
+            while (offsetAtual < tamanhoTotal) {
+                let tamanhoPedaco = Math.min(chunkSize, tamanhoTotal - offsetAtual);
+
+                log(`Baixando bloco: offset ${offsetAtual}, tamanho ${tamanhoPedaco}...`);
+
+                // Pede o bloco e salva exatamente no índice correspondente (indiceDestino = offsetAtual)
+                let sucesso = await getBlocoEspecifico(page, offsetAtual, tamanhoPedaco, offsetAtual);
+                
+                if (!sucesso) {
+                    log(`Erro ao ler bloco da página ${page} no offset ${offsetAtual}`, 'err');
+                    isFetchingVE = false;
+                    startRequestLoop();
+                    return false;
+                }
+
+                // Respiro de 30ms entre um bloco e outro para a ECU respirar
+                await new Promise(r => setTimeout(r, 30));
+
+                offsetAtual += tamanhoPedaco;
+            }
+
+            log(`Página ${page} obtida e montada com sucesso!`, 'rx');
+            
+            isFetchingVE = false;
+            startRequestLoop(); // Retoma a telemetria
+            return true;
+        }
+
+        async function getBlocoEspecifico(page, offset, tamanhoPedaco, indiceDestino) {
+            if (!globalWriter) {
+                alert("Porta serial não conectada!");
+                return false;
+            }
+
+            rxBuffer = new Uint8Array(0);
+
+            let payload = new Uint8Array(7);
+            payload[0] = 0x70;
+            payload[1] = 0x00;
+            payload[2] = page; 
+            payload[3] = offset & 0xFF;
+            payload[4] = (offset >> 8) & 0xFF;
+            payload[5] = tamanhoPedaco & 0xFF;
+            payload[6] = (tamanhoPedaco >> 8) & 0xFF;
+
+            let crc = calculateCRC32(payload);
+
+            let frame = new Uint8Array(13);
+            frame[0] = 0x00;
+            frame[1] = 0x07;
+            frame.set(payload, 2);
+            frame[9]  = (crc >> 24) & 0xFF;
+            frame[10] = (crc >> 16) & 0xFF;
+            frame[11] = (crc >> 8) & 0xFF;
+            frame[12] = crc & 0xFF;
+
+            let hexString = Array.from(frame).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+            log(`TX [Página ${page}] -> [${hexString}] (Offset: ${offset}, Tam: ${tamanhoPedaco})`, 'tx');
+
+            try {
+                await globalWriter.write(frame);
+
+                let startTime = performance.now();
+                let neededBytes = tamanhoPedaco + 2; 
+
+                while (port && port.readable) {
+                    if (performance.now() - startTime > 1000) {
+                        log(`Erro: Timeout no offset ${offset} (Página ${page})`, 'err');
+                        return false;
+                    }
+                    if (rxBuffer.length >= neededBytes) break;
+                    await new Promise(r => setTimeout(r, 5));
+                }
+
+                if (rxBuffer.length < neededBytes) {
+                    log(`Erro: Timeout (dados insuficientes) no offset ${offset} (Página ${page})`, 'err');
+                    return false;
+                }
+
+                let dadosLimpos = rxBuffer.slice(3, 3 + tamanhoPedaco);
+                
+                if (!fullPages[page]) {
+                    fullPages[page] = new Uint8Array(fullPageSize[page]);
+                }
+                fullPages[page].set(dadosLimpos, indiceDestino);
+            
+                rxBuffer = rxBuffer.slice(3 + tamanhoPedaco);
+                return true;
+
+            } catch (err) {
+                log(`Erro no bloco da Página ${page}: ` + err.message, 'err');
+                return false;
+            }
+        }
+
+        function switchTab(tab) {
+            const viewDashboard = document.getElementById('viewDashboard');
+            const viewConnect = document.getElementById('viewConnect');
+            const viewTabelaVE = document.getElementById('viewTabelaVE');
+
+            const tabDashboardBtn = document.getElementById('tabDashboardBtn');
+            const tabConnectBtn = document.getElementById('tabConnectBtn');
+            const tabTabelaVEBtn = document.getElementById('tabTabelaVEBtn');
+
+            viewDashboard.classList.add('hidden');
+            viewConnect.classList.add('hidden');
+            viewTabelaVE.classList.add('hidden');
+
+            tabDashboardBtn.className = "tab-btn";
+            tabConnectBtn.className = "tab-btn";
+            tabTabelaVEBtn.className = "tab-btn";
+
+            if (tab === 'dashboard') {
+                viewDashboard.classList.remove('hidden');
+                tabDashboardBtn.className = "tab-btn active";
+                drawGauge('gaugeRPM', parseInt(document.getElementById('valRPM').innerText) || 0, 0, 8000, '#04d361');
+                drawGauge('gaugeMAP', parseInt(document.getElementById('valMAP').innerText) || 0, 0, 250, '#8257e5');
+            } else if (tab === 'connect') {
+                viewConnect.classList.remove('hidden');
+                tabConnectBtn.className = "tab-btn active";
+            } else if (tab === 'tabelaVE') {
+                viewTabelaVE.classList.remove('hidden');
+                tabTabelaVEBtn.className = "tab-btn active";
+                lerPaginaCompletaAutomatica(paginaAtivaAtual, tableNameAtual);
+            }
+        }
+
+        function log(msg, type = 'rx') {
+            const box = document.getElementById('logConsole');
+            let colorClass = 'color: #9ca3af;';
+            if (type === 'tx') colorClass = 'color: #fbbf24;';
+            if (type === 'err') colorClass = 'color: #fb7185;';
+            if (type === 'rx') colorClass = 'color: #34d399;';
+            if (type === 'gray') colorClass = 'color: #9ca3af;';
+            box.innerHTML += `<div style="${colorClass}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logConsole').innerHTML = '<div>[INIT] Console limpo.</div>';
+        }
+
+        function calculateCRC32(data) {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= data[i];
+                for (let j = 0; j < 8; j++) {
+                    if (crc & 1) {
+                        crc = (crc >>> 1) ^ 0xEDB88320;
+                    } else {
+                        crc = crc >>> 1;
+                    }
+                }
+            }
+            return ~crc >>> 0;
+        }
+
+        function logAllOutputChannelsWithBits(buf) {
+            const now = performance.now();
+            if (now - lastConsolePrintTime < CONSOLE_PRINT_INTERVAL) return;
+            lastConsolePrintTime = now;
+
+            const off = 3; // OFFSET_MODERNO
+
+            // Funções auxiliares de leitura numérica
+            const u8  = (i) => buf[off + i];
+            const s8  = (i) => { let v = buf[off + i]; return v > 127 ? v - 256 : v; };
+            const u16 = (i) => buf[off + i] | (buf[off + i + 1] << 8);
+            const s16 = (i) => { let v = buf[off + i] | (buf[off + i + 1] << 8); return v > 32767 ? v - 65536 : v; };
+
+            // Função auxiliar para extrair bits individuais de um byte
+            const getBit = (byteVal, bitPos) => (byteVal & (1 << bitPos)) ? 1 : 0;
+            const getBitsRange = (byteVal, start, end) => {
+                const mask = ((1 << (end - start + 1)) - 1) << start;
+                return (byteVal & mask) >> start;
+            };
+
+            // --- LEITURA DOS BYTES DE STATUS PARA DESMEMBRAR OS BITS ---
+            const bStatus1 = u8(1);
+            const bEngine  = u8(2);
+            const bStatus2 = u8(32);
+            const bErrors  = u8(75);
+            const bStatus3 = u8(84);
+            const bProt    = u8(85);
+            const bStatus4 = u8(110);
+            const bStatus5 = u8(127);
+
+            // --- EXTRAÇÃO DE 100% DOS OUTPUT CHANNELS + BITS ---
+            const data = {
+                // Geral / Sistema
+                secl: u8(0),
+                syncLossCounter: u8(3),
+                loopsPerSecond: u16(26),
+                freeRAM: u16(28),
+
+                // --- BITS DO STATUS 1 (Byte 1) ---
+                inj1Status: getBit(bStatus1, 0),
+                inj2Status: getBit(bStatus1, 1),
+                inj3Status: getBit(bStatus1, 2),
+                inj4Status: getBit(bStatus1, 3),
+                DFCOOn: getBit(bStatus1, 4),
+                boostCutFuel: getBit(bStatus1, 5),
+                toothLog1Ready: getBit(bStatus1, 6),
+                toothLog2Ready: getBit(bStatus1, 7),
+
+                // --- BITS DO ENGINE (Byte 2) ---
+                running: getBit(bEngine, 0),
+                crank: getBit(bEngine, 1),
+                ase: getBit(bEngine, 2),
+                warmup: getBit(bEngine, 3),
+                tpsaccaen: getBit(bEngine, 4),
+                tpsaccden: getBit(bEngine, 5),
+                mapaccaen: getBit(bEngine, 6),
+                mapaccden: getBit(bEngine, 7),
+
+                // Motor & Ignição
+                rpm: u16(14),
+                rpmDOT: s16(33),
+                advance: s8(24),
+                advance1: s8(118),
+                advance2: s8(119),
+
+                // Admissão / Pressão / TPS
+                map: u16(4),
+                baro: u8(41),
+                tps: u8(25) * 0.5,
+                tpsADC: u8(74),
+                TPSdot: s16(22),
+                MAPdot: s16(93),
+                emap: u16(121),
+
+                // Temperaturas (com conversão -40)
+                iat: u8(6) - 40,
+                coolant: u8(7) - 40,
+                fuelTemp: u8(116) - 40,
+
+                // Elétrica & Combustível / AFR
+                batteryVoltage: u8(9) * 0.1,
+                batCorrection: u8(8),
+                afr: u8(10) * 0.1,
+                afr2: u8(40) * 0.1,
+                afrTarget: u8(21) * 0.1,
+                egoCorrection: u8(11),
+
+                // Injeção / VE / PW
+                VE1: u8(19),
+                VE2: u8(20),
+                veCurr: u8(102),
+                ASECurr: u8(103),
+                warmupEnrich: u8(13),
+                pulseWidth: u16(76) * 0.001,
+                pulseWidth2: u16(78) * 0.001,
+                fuelLoad: s16(86),
+                ignLoad: s16(88),
+                dwell: u16(90) * 0.001,
+
+                // --- BITS DO STATUS 2 (Byte 32) ---
+                launchHard: getBit(bStatus2, 0),
+                launchSoft: getBit(bStatus2, 1),
+                hardLimitOn: getBit(bStatus2, 2),
+                softlimitOn: getBit(bStatus2, 3),
+                boostCutSpark: getBit(bStatus2, 4),
+                errorBit: getBit(bStatus2, 5),
+                idleControlOn: getBit(bStatus2, 6),
+                sync: getBit(bStatus2, 7),
+
+                // Boost, VVT & Extras
+                boostTarget: u8(30) * 2.0,
+                boostDuty: u8(31),
+                CLIdleTarget: u8(92) * 10.0,
+                vvt1Angle: s16(95) * 0.5,
+                vss: u16(104),
+                gear: u8(106),
+                fuelPressure: u8(107),
+                oilPressure: u8(108),
+                knockEventCount: u8(128),
+                knockCor: u8(129),
+
+                // --- BITS DE ERROS E STATUS 3, 4, 5 ---
+                errorNum: getBitsRange(bErrors, 0, 1),
+                currentError: getBitsRange(bErrors, 2, 7),
+                halfSync: getBit(bStatus3, 4),
+                engineProtectRPM: getBit(bProt, 0),
+                engineProtectMAP: getBit(bProt, 1),
+                engineProtectOil: getBit(bProt, 2),
+                fanStatus: getBit(bStatus4, 3),
+                flatShiftHardActive: getBit(bStatus5, 0),
+                knockActive: getBit(bStatus5, 3)
+            };
+
+            // Impressão 100% detalhada de todas as variáveis na console
+            console.group("🚀 [Speeduino] DUMP 100% COMPLETO (Sensores + Status Bit a Bit)");
+            
+            console.log("⏱️ Sistema & Geral:", { 
+                secl: data.secl, 
+                loopsPerSecond: data.loopsPerSecond, 
+                freeRAM: data.freeRAM, 
+                syncLossCounter: data.syncLossCounter 
+            });
+
+            console.log("🔥 Motor, Ponto & Sincronismo:", { 
+                rpm: data.rpm, 
+                rpmDOT: data.rpmDOT, 
+                advance: data.advance, 
+                advance1: data.advance1, 
+                advance2: data.advance2, 
+                dwell: data.dwell, 
+                running: data.running, 
+                crank: data.crank, 
+                ase: data.ase, 
+                warmup: data.warmup, 
+                sync: data.sync, 
+                halfSync: data.halfSync 
+            });
+
+            console.log("💨 Admissão, Pressão & TPS:", { 
+                map: data.map, 
+                baro: data.baro, 
+                tps: data.tps.toFixed(1) + '%', 
+                tpsADC: data.tpsADC, 
+                TPSdot: data.TPSdot, 
+                MAPdot: data.MAPdot, 
+                emap: data.emap 
+            });
+
+            console.log("🌡️ Temperaturas, Elétrica & AFR:", { 
+                coolant: data.coolant + '°C', 
+                iat: data.iat + '°C', 
+                fuelTemp: data.fuelTemp + '°C', 
+                batteryVoltage: data.batteryVoltage.toFixed(1) + 'V', 
+                batCorrection: data.batCorrection + '%', 
+                afr: data.afr.toFixed(1), 
+                afr2: data.afr2.toFixed(1), 
+                afrTarget: data.afrTarget.toFixed(1), 
+                egoCorrection: data.egoCorrection + '%' 
+            });
+
+            console.log("⛽ Injeção, VE & PW:", { 
+                VE1: data.VE1, 
+                VE2: data.VE2, 
+                veCurr: data.veCurr, 
+                ASECurr: data.ASECurr, 
+                warmupEnrich: data.warmupEnrich, 
+                pulseWidth: data.pulseWidth.toFixed(2) + 'ms', 
+                pulseWidth2: data.pulseWidth2.toFixed(2) + 'ms', 
+                fuelLoad: data.fuelLoad, 
+                ignLoad: data.ignLoad 
+            });
+
+            console.log("⚙️ Boost, VVT, Atuadores & Extras:", { 
+                boostTarget: data.boostTarget, 
+                boostDuty: data.boostDuty, 
+                CLIdleTarget: data.CLIdleTarget, 
+                vvt1Angle: data.vvt1Angle, 
+                vss: data.vss, 
+                gear: data.gear, 
+                fuelPressure: data.fuelPressure, 
+                oilPressure: data.oilPressure, 
+                knockEventCount: data.knockEventCount, 
+                knockCor: data.knockCor 
+            });
+
+            console.log("🔌 Status dos Injetores & Auxiliares (Bits):", { 
+                inj1: data.inj1Status, 
+                inj2: data.inj2Status, 
+                inj3: data.inj3Status, 
+                inj4: data.inj4Status, 
+                DFCO: data.DFCOOn, 
+                boostCutFuel: data.boostCutFuel, 
+                tpsacc: data.tpsaccaen, 
+                mapacc: data.mapaccaen 
+            });
+
+            console.log("🚦 Flags de Segurança, Cortes & Erros (Bits):", { 
+                launchHard: data.launchHard, 
+                launchSoft: data.launchSoft, 
+                hardLimitOn: data.hardLimitOn, 
+                softlimitOn: data.softlimitOn, 
+                boostCutSpark: data.boostCutSpark, 
+                engineProtectRPM: data.engineProtectRPM, 
+                engineProtectMAP: data.engineProtectMAP, 
+                engineProtectOil: data.engineProtectOil, 
+                fanStatus: data.fanStatus, 
+                flatShift: data.flatShiftHardActive, 
+                knockActive: data.knockActive, 
+                errorNum: data.errorNum, 
+                currentError: data.currentError 
+            });
+
+            console.groupEnd();
+        }
+
+        async function lerBlocoEspecifico(page, offset, tamanhoPedaco, indiceDestino) {
+            if (!globalWriter) {
+                alert("Porta serial não conectada!");
+                return false;
+            }
+
+            rxBuffer = new Uint8Array(0);
+
+            let payload = new Uint8Array(7);
+            payload[0] = 0x70;
+            payload[1] = 0x00;
+            payload[2] = page; 
+            payload[3] = offset & 0xFF;
+            payload[4] = (offset >> 8) & 0xFF;
+            payload[5] = tamanhoPedaco & 0xFF;
+            payload[6] = (tamanhoPedaco >> 8) & 0xFF;
+
+            let crc = calculateCRC32(payload);
+
+            let frame = new Uint8Array(13);
+            frame[0] = 0x00;
+            frame[1] = 0x07;
+            frame.set(payload, 2);
+            frame[9]  = (crc >> 24) & 0xFF;
+            frame[10] = (crc >> 16) & 0xFF;
+            frame[11] = (crc >> 8) & 0xFF;
+            frame[12] = crc & 0xFF;
+
+            let hexString = Array.from(frame).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+            log(`TX [Página ${page}] -> [${hexString}] (Offset: ${offset}, Tam: ${tamanhoPedaco})`, 'tx');
+
+            try {
+                await globalWriter.write(frame);
+
+                let startTime = performance.now();
+                let neededBytes = tamanhoPedaco + 2; 
+
+                while (port && port.readable) {
+                    if (performance.now() - startTime > 600) {
+                        log(`Erro: Timeout no offset ${offset} (Página ${page})`, 'err');
+                        return false;
+                    }
+                    if (rxBuffer.length >= neededBytes) break;
+                    await new Promise(r => setTimeout(r, 5));
+                }
+
+                if (rxBuffer.length < neededBytes) {
+                    log(`Erro: Timeout (dados insuficientes) no offset ${offset} (Página ${page})`, 'err');
+                    return false;
+                }
+
+                let dadosLimpos = rxBuffer.slice(3, 3 + tamanhoPedaco);
+                
+                if (!paginasECU[page]) {
+                    paginasECU[page] = new Uint8Array(288);
+                }
+                paginasECU[page].set(dadosLimpos, indiceDestino);
+
+                rxBuffer = rxBuffer.slice(3 + tamanhoPedaco);
+                return true;
+
+            } catch (err) {
+                log(`Erro no bloco da Página ${page}: ` + err.message, 'err');
+                return false;
+            }
+        }
+
+        async function lerPaginaCompletaAutomatica(page, tableName) {
+            if (!port) {
+                alert("Conecte a ECU primeiro na aba 'Conectar ECU'.");
+                return;
+            }
+
+            if (page == 2) {
+                document.getElementById("btn-tabela-ve").className = "btn btn-violet";
+                document.getElementById("btn-tabela-ve2").className = "btn btn-purple";
+                document.getElementById("btn-tabela-afr").className = "btn btn-purple";
+                document.getElementById("btn-tabela-lambda").className = "btn btn-purple";
+            } else if (page == 11) {
+                document.getElementById("btn-tabela-ve").className = "btn btn-purple";
+                document.getElementById("btn-tabela-ve2").className = "btn btn-violet";
+                document.getElementById("btn-tabela-afr").className = "btn btn-purple";
+                document.getElementById("btn-tabela-lambda").className = "btn btn-purple";
+            } else if (page == 5 && tableName === "afr") {
+                document.getElementById("btn-tabela-ve").className = "btn btn-purple";
+                document.getElementById("btn-tabela-ve2").className = "btn btn-purple";
+                document.getElementById("btn-tabela-afr").className = "btn btn-violet";
+                document.getElementById("btn-tabela-lambda").className = "btn btn-purple";
+            } else if (page == 5 && tableName === "lambda") {
+                document.getElementById("btn-tabela-ve").className = "btn btn-purple";
+                document.getElementById("btn-tabela-ve2").className = "btn btn-purple";
+                document.getElementById("btn-tabela-afr").className = "btn btn-purple";
+                document.getElementById("btn-tabela-lambda").className = "btn btn-violet";
+            }
+
+            isFetchingVE = true;
+            stopRequestLoop();
+            await new Promise(r => setTimeout(r, 100));
+            rxBuffer = new Uint8Array(0);
+
+            log(`--- INICIANDO LEITURA DA PÁGINA ${page} ---`, 'tx');
+
+            if (!await lerBlocoEspecifico(page, 0, 128, 0)) {
+                isFetchingVE = false;
+                startRequestLoop();
+                return;
+            }
+            await new Promise(r => setTimeout(r, 20));
+
+            if (!await lerBlocoEspecifico(page, 128, 128, 128)) {
+                isFetchingVE = false;
+                startRequestLoop();
+                return;
+            }
+            await new Promise(r => setTimeout(r, 20));
+
+            if (!await lerBlocoEspecifico(page, 256, 32, 256)) {
+                isFetchingVE = false;
+                startRequestLoop();
+                return;
+            }
+
+            log(`Página ${page} lida com sucesso! Renderizando grid...`, 'rx');
+            paginaAtivaAtual = page;
+            tableNameAtual = tableName;
+
+            
+            renderizarGridVE(paginaAtivaAtual, tableNameAtual);
+            
+
+            isFetchingVE = false;
+            startRequestLoop();
+        }
+
+        function getActiveCellIndices(page, rpm, map) {
+            let dadosPagina = paginasECU[page];
+            if (!dadosPagina) return { col: -1, row: -1 };
+
+            let rpmBins = [];
+            for (let i = 0; i < 16; i++) rpmBins.push(dadosPagina[256 + i] * 100);
+
+            let loadBins = [];
+            for (let i = 0; i < 16; i++) loadBins.push(dadosPagina[272 + i] * 2);
+
+            let col = 0;
+            for (let i = 0; i < 15; i++) {
+                if (rpm >= rpmBins[i] && rpm <= rpmBins[i+1]) { col = i; break; }
+                if (rpm > rpmBins[15]) col = 15;
+            }
+
+            let row = 0;
+            for (let i = 0; i < 15; i++) {
+                if (map >= loadBins[i] && map <= loadBins[i+1]) { row = i; break; }
+                if (map > loadBins[15]) row = 15;
+            }
+
+            return { col, row };
+        }
+
+        function renderizarGridVE(page, tableName) {
+            const container = document.getElementById('veGridContainer');
+            container.innerHTML = '';
+
+            let dadosPagina = paginasECU[page];
+            if (!dadosPagina) {
+                dadosPagina = new Uint8Array(288);
+            }
+
+            let rpmBins = [];
+            for (let i = 0; i < 16; i++) rpmBins.push(dadosPagina[256 + i] * 100);
+
+            let loadBins = [];
+            for (let i = 0; i < 16; i++) loadBins.push(dadosPagina[272 + i] * 2);
+
+            let activeCell = getActiveCellIndices(page, currentRPM, currentMAP);
+
+            let minVE = 99999, maxVE = -99999;
+            let valoresVE = [];
+            for (let l = 0; l < 16; l++) {
+                valoresVE[l] = [];
+                for (let c = 0; c < 16; c++) {
+                    let val = dadosPagina[(l * 16) + c];
+                    valoresVE[l][c] = val;
+                    if (val < minVE) minVE = val;
+                    if (val > maxVE) maxVE = val;
+                }
+            }
+            if (minVE === maxVE) maxVE = minVE + 1;
+
+            for (let linha = 0; linha < 17; linha++) {
+                for (let coluna = 0; coluna < 17; coluna++) {
+                    const celula = document.createElement('div');
+                    celula.className = "ve-cell";
+
+                    if (linha === 0 && coluna === 0) {
+                        celula.innerText = `MAP\\RPM`;
+                        celula.className += " ve-header-cell";
+                    } 
+                    else if (linha === 0 && coluna > 0) {
+                        celula.innerText = rpmBins[coluna - 1];
+                        celula.className += " ve-header-cell";
+                        celula.style.fontSize = "11px";
+                    } 
+                    else if (coluna === 0 && linha > 0) {
+                        celula.innerText = loadBins[16 - linha];
+                        celula.className += " ve-header-cell";
+                    } 
+                    else {
+                        let linhaCel = 16 - linha;
+                        let valRaw = valoresVE[linhaCel][coluna - 1];
+
+                        // --- TRATAMENTO DE VALORES POR PÁGINA (FÁCIL DE ESCALAR) ---
+                        let valFinal;
+                        if (tableName === "afr") {
+                            valFinal = (valRaw * 0.1).toFixed(1);
+                        } 
+                        else if (tableName === "lambda") {
+                            valFinal = ((valRaw * 0.1) / stoich).toFixed(1); // Exemplo para a página 6
+                        } 
+                        else {
+                            valFinal = valRaw; // Páginas padrão (ex: VE nas páginas 2 e 11)
+                        }
+                        
+                        celula.innerText = valFinal;
+
+                        let percent = Math.min(Math.max((valRaw - minVE) / (maxVE - minVE), 0), 1) * 255;
+                        let r = percent < 128 ? Math.round((percent / 127) * 255) : 255;
+                        let g = percent < 128 ? 220 : Math.round(((255 - percent) / 127) * 220);
+                        let b = 0;
+
+                        celula.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                        celula.style.color = "#000000";
+
+                        if (activeCell.row === linhaCel && activeCell.col === (coluna - 1)) {
+                            celula.style.border = "3px solid #ef4444";
+                            celula.style.boxShadow = "inset 0 0 8px rgba(239, 68, 68, 0.8)";
+                            celula.style.fontWeight = "bold";
+                        }
+                    }
+                    container.appendChild(celula);
+                }
+            }
+        }
+
+        async function toggleConnect() {
+            if (port) await disconnectSerial();
+            else await connectSerial();
+        }
+
+        async function connectSerial() {
+            if (!("serial" in navigator)) return alert("Web Serial não suportada.");
+
+            try {
+                const baud = parseInt(document.getElementById('baudRate').value) || 115200;
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: baud, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none', bufferSize: 65536 });
+
+                globalWriter = port.writable.getWriter();
+
+                updateStatus(true, "Conectado");
+                log("Porta aberta com sucesso. A aguardar estabilização do boot (2s)...");
+
+                keepReading = true;
+                readSerialLoop(); // Inicia o loop que agora gerencia a leitura com segurança
+
+                setTimeout(async () => {
+                    if (globalWriter) {
+                        rxBuffer = new Uint8Array(0); 
+                        await globalWriter.write(new TextEncoder().encode("Q"));
+                        log("TX -> Enviado comando 'Q'", 'tx');
+
+                        // --- CAPTURANDO O RETORNO DO 'Q' ---
+                        let signature = "";
+                        let startTime = performance.now();
+                        
+                        while (port && port.readable) {
+                            if (performance.now() - startTime > 600) break;
+                            
+                            if (rxBuffer.length > 0) {
+                                let textResponse = new TextDecoder().decode(rxBuffer);
+                                signature = textResponse.trim();
+                            }
+                            await new Promise(r => setTimeout(r, 10));
+                        }
+
+                        if (signature) {
+                            log(`RX [Assinatura ECU] -> ${signature}`, 'rx');
+                            document.getElementById("assinatura-ecu").innerText = `(${signature})`;
+                        } else {
+                            log("RX [Assinatura ECU] -> Resposta recebida, mas sem quebra de linha clara.", 'err');
+                        }
+
+                        rxBuffer = new Uint8Array(0); 
+
+                        // --- CARREGAMENTO DAS PÁGINAS ---
+                        log("Lendo configurações iniciais da Página 1...");
+                        await getPage(1); 
+                        await new Promise(r => setTimeout(r, 400));
+                        
+                        log("Lendo configurações iniciais da Página 2...");
+                        await getPage(2); 
+                        await new Promise(r => setTimeout(r, 400));
+                        
+                        log("Lendo configurações iniciais da Página 3...");
+                        await getPage(3); 
+                        
+                        log("lendo Stoich...");
+                        stoich = await readPage(1,50) * 0.1;
+                        if (stoich > 0) {
+                            log(`Stoich: ${stoich}`);
+                        } else {
+                            log("erro lendo stoich...");
+                        }
+
+                        let fullpage1 = await readPage(1);
+                        log(`Lendo Pagina 1 -> ${fullpage1}`, 'gray');
+
+                        let fullpage2 = await readPage(2);
+                        log(`Lendo Pagina 2 -> ${fullpage2}`, 'gray');
+
+                        let fullpage3 = await readPage(3);
+                        log(`Lendo Pagina 3 -> ${fullpage3}`, 'gray');
+
+                        setTimeout(() => {
+                            log("Iniciando fluxo síncrono de telemetria (121 bytes)...");
+                            startRequestLoop();
+                        }, 500);
+                    }
+                }, 2000);
+
+            } catch (err) {
+                log("Erro: " + err.message, 'err');
+                updateStatus(false, "Erro ao conectar");
+            }
+        }
+
+        async function disconnectSerial() {
+            keepReading = false;
+            stopRequestLoop();
+            if (globalWriter) {
+                try { await globalWriter.releaseLock(); } catch(e) {}
+                globalWriter = null;
+            }
+            if (reader) { await reader.cancel(); reader = null; }
+            if (port) { await port.close(); port = null; }
+            updateStatus(false, "Desconectado");
+            log("Desconectado da porta serial.", 'err');
+        }
+
+        function startRequestLoop() {
+            stopRequestLoop();
+            waitingForResponse = false;
+
+            // Pega o valor selecionado na combobox (ex: 20 ms) ou usa 20 como padrão
+            const intervaloMs = parseInt(document.getElementById('intervalRate').value) || 20;
+
+
+            requestLoopTimer = setInterval(async () => {
+                if (!globalWriter || isSimulating || isFetchingVE) return;
+                if (waitingForResponse) return; // Evita sobreposição se a ECU demorar
+
+                try {
+                    waitingForResponse = true;
+                    await globalWriter.write(pacote1_TS);
+                    
+                    responseTimeoutTimer = setTimeout(() => {
+                        if (waitingForResponse) {
+                            waitingForResponse = false;
+                        }
+                    }, 200);
+
+                } catch (e) {
+                    console.error("Erro no envio:", e);
+                    waitingForResponse = false;
+                }
+            }, intervaloMs); // Aqui controla a taxa de atualizacao do dashboard.
+        }
+
+        function stopRequestLoop() {
+            if (requestLoopTimer) { clearInterval(requestLoopTimer); requestLoopTimer = null; }
+            if (responseTimeoutTimer) { clearTimeout(responseTimeoutTimer); responseTimeoutTimer = null; }
+            waitingForResponse = false;
+        }
+
+        async function readSerialLoop() {
+            while (port && port.readable && keepReading) {
+                let localReader = null;
+                try {
+                    if (port.readable.locked) {
+                        await new Promise(r => setTimeout(r, 100));
+                        continue;
+                    }
+
+                    localReader = port.readable.getReader();
+                    reader = localReader; 
+                    
+                    while (keepReading && port && port.readable) {
+                        const { value, done } = await localReader.read();
+                        if (done) break;
+                        
+                        if (value) {
+                            if (isFetchingVE) {
+                                // Modo Configuração (getPage): acumula no rxBuffer
+                                let temp = new Uint8Array(rxBuffer.length + value.length);
+                                temp.set(rxBuffer);
+                                temp.set(value, rxBuffer.length);
+                                rxBuffer = temp;
+                            } else {
+                                // Modo Telemetria ao vivo: processa normalmente
+                                appendBuffer(value);
+                                processBuffer();
+                            }
+                        }
+                    }
+                } catch (error) {
+                    if (keepReading) {
+                        await new Promise(r => setTimeout(r, 300));
+                    }
+                } finally {
+                    if (localReader) {
+                        try {
+                            localReader.releaseLock();
+                        } catch (e) {}
+                    }
+                }
+            }
+        }
+
+        function appendBuffer(newBytes) {
+            const merged = new Uint8Array(rxBuffer.length + newBytes.length);
+            merged.set(rxBuffer, 0);
+            merged.set(newBytes, rxBuffer.length);
+            rxBuffer = merged;
+        }
+
+        function processBuffer() {
+            if (isFetchingVE) return;
+
+            if (rxBuffer.length > 4000) {
+                rxBuffer = new Uint8Array(0);
+                waitingForResponse = false;
+                return;
+            }
+
+            while (rxBuffer.length >= TARGET_PACKET_SIZE) {
+                if (waitingForResponse) {
+                    waitingForResponse = false;
+                    if (responseTimeoutTimer) { clearTimeout(responseTimeoutTimer); responseTimeoutTimer = null; }
+                }
+
+                // Transforma todo o rxBuffer atual em uma string Hexadecimal
+//                let bufferHex = Array.from(rxBuffer).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+//                console.log("RX Buffer Completo:", bufferHex);
+                // Ou na tela:
+//                log(`Buffer Completo (${rxBuffer.length} bytes): ${bufferHex}`, 'err');
+
+
+                const packet = rxBuffer.slice(0, TARGET_PACKET_SIZE);
+
+                // --- ADICIONE ESTAS LINHAS AQUI PARA IMPRIMIR O SLICE NA CONSOLE ---
+//                let hexString = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+//                log(`Slice do Buffer (${packet.length} bytes): ${hexString}`, 'rx');
+                // -----------------------------------------------------------------
+                
+                
+                if (isValidPacket(packet)) {
+                    rxBuffer = rxBuffer.slice(TARGET_PACKET_SIZE);
+                    validPacketsCount++;
+                    
+                    const elValid = document.getElementById('cntValid');
+                    if (elValid) elValid.innerText = validPacketsCount;
+
+                    parseEcuPacket(packet);
+
+                    const now = performance.now();
+                    hzCounter++;
+                    if (now - lastPacketTime >= 1000) {
+                        const elHz = document.getElementById('valHz');
+                        if (elHz) elHz.innerText = hzCounter;
+                        hzCounter = 0;
+                        lastPacketTime = now;
+                    }
+                } else {
+                    rxBuffer = rxBuffer.slice(1);
+                    errorPacketsCount++;
+                }
+            }
+        }
+
+        function isValidPacket(buf) {
+            if (buf.length < 3) return false;
+
+            // --- TRANSFORMA O BUFFER EM UMA STRING HEXADECIMAL E IMPRIME ---
+            //let hexString = Array.from(buf).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+            //console.log(`Buffer completo (${buf.length} bytes):`, hexString);
+            // -------------------------------------------------------------
+
+            // Extrai o tamanho dos 2 primeiros bytes (0x007A = 122)
+            const tamanhoPacote = (buf[0] << 8) | buf[1];
+
+            // Valida se o tamanho informado bate com o cabeçalho real da ECU (122)
+            // Ou você pode aceitar o tamanho real do pacote lido
+            if (tamanhoPacote !== 122) {
+                return false;
+            }
+
+            // Checagem secundária opcional de sanidade do RPM
+            //const rpm = buf[OFFSET_MODERNO + 14] | (buf[OFFSET_MODERNO + 15] << 8);
+            //if (rpm > 12000) return false;
+
+            return true;
+        }
+
+        function parseEcuPacket(buf) {
+            const map = buf[OFFSET_MODERNO + 4] | (buf[OFFSET_MODERNO + 5] << 8);
+            const clt = buf[OFFSET_MODERNO + 7] - 40;
+            const iat = buf[OFFSET_MODERNO + 6] - 40;
+            const bat = buf[OFFSET_MODERNO + 9] * 0.1;
+            const afr = buf[OFFSET_MODERNO + 10] * 0.1;
+            const rpm = buf[OFFSET_MODERNO + 14] | (buf[OFFSET_MODERNO + 15] << 8);
+            const tps = buf[OFFSET_MODERNO + 25] * 0.5;
+            const veCurr = buf[OFFSET_MODERNO + 102];
+
+            const advance = buf[OFFSET_MODERNO + 24];
+            const FuelPressure = buf[OFFSET_MODERNO + 107] * PSI_BAR_CONVERSION;
+            const OilPressure = buf[OFFSET_MODERNO + 108] * PSI_BAR_CONVERSION;
+            const pulseWidth = (buf[OFFSET_MODERNO + 76] | (buf[OFFSET_MODERNO + 77] << 8)) * 0.001;
+
+            const lambdaConvertidaAlcool = afr / stoich;
+
+
+            // Imprime 100% dos canais formatados a cada 5 segundos
+            //logAllOutputChannelsWithBits(buf);
+
+
+            
+            currentRPM = isNaN(rpm) ? 0 : rpm;
+            currentMAP = isNaN(map) ? 0 : map;
+
+            updateDashboard({
+                rpm: currentRPM,
+                map: currentMAP,
+                tps: isNaN(tps) ? 0 : Math.round(tps),
+                clt: isNaN(clt) ? 0 : clt,
+                iat: isNaN(iat) ? 0 : iat,
+                lambdaConvertidaAlcool: isNaN(lambdaConvertidaAlcool) ? 1.00 : lambdaConvertidaAlcool,
+                bat: isNaN(bat) ? 12.0 : bat,
+                veCurr: isNaN(veCurr) ? 0 : veCurr,
+                advance: isNaN(advance) ? 0 : advance,
+                pulseWidth: isNaN(pulseWidth) ? 0 : pulseWidth,
+                FuelPressure: isNaN(FuelPressure) ? 0 : FuelPressure,
+                OilPressure: isNaN(OilPressure) ? 0 : OilPressure
+                
+            });
+
+            const viewTabelaVE = document.getElementById('viewTabelaVE');
+            if (viewTabelaVE && !viewTabelaVE.classList.contains('hidden')) {
+                renderizarGridVE(paginaAtivaAtual, tableNameAtual);
+            }
+        }
+
+        function updateDashboard(data) {
+            document.getElementById('valRPM').innerText = data.rpm;
+            document.getElementById('valMAP').innerText = data.map;
+            document.getElementById('valTPS').innerText = data.tps;
+            document.getElementById('tpsBadge').innerText = data.tps + '%';
+            document.getElementById('valLambda').innerText = data.lambdaConvertidaAlcool.toFixed(2);
+            document.getElementById('vallambdaTarget').innerText = "1.00";
+            document.getElementById('valCLT').innerText = data.clt;
+            document.getElementById('valBAT').innerText = data.bat.toFixed(1);
+            document.getElementById('tpsBar').style.width = Math.min(Math.max(data.tps, 0), 100) + '%';
+
+            document.getElementById('valAdvance').innerText = data.advance.toFixed(1);
+            document.getElementById('valPW').innerText = data.pulseWidth.toFixed(2);
+            document.getElementById('valIAT').innerText = data.iat;
+
+         
+            //if (data.advance !== undefined) document.getElementById('valAdvance').innerText = data.advance.toFixed(1);
+            //if (data.pw !== undefined) document.getElementById('valPW').innerText = data.pw.toFixed(2);
+            //if (data.iat !== undefined) document.getElementById('valIAT').innerText = data.iat;
+
+            const cltPct = Math.min(Math.max(((data.clt + 40) / 160) * 100, 0), 100);
+            const cltBar = document.getElementById('cltBar');
+            const cltBadge = document.getElementById('cltBadge');
+
+            cltBar.style.width = cltPct + '%';
+
+            if (data.clt < 70) {
+                document.getElementById('valCLT').style.color = "#06b6d4";
+                cltBar.style.backgroundColor = "#06b6d4";
+                cltBadge.innerText = "COLD";
+                cltBadge.style.color = "#06b6d4";
+            } else if (data.clt <= 90) {
+                document.getElementById('valCLT').style.color = "#f59e0b";
+                cltBar.style.backgroundColor = "#f59e0b";
+                cltBadge.innerText = "WARM";
+                cltBadge.style.color = "#f59e0b";
+            } else {
+                document.getElementById('valCLT').style.color = "#f43f5e";
+                cltBar.style.backgroundColor = "#f43f5e";
+                cltBadge.innerText = "HOT!";
+                cltBadge.style.color = "#f43f5e";
+            }
+
+            drawGauge('gaugeRPM', data.rpm, 0, 8000, '#04d361');
+            drawGauge('gaugeMAP', data.map, 0, 250, '#8257e5');
+        }
+
+        function drawGauge(canvasId, val, minVal, maxVal, color) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width; const h = canvas.height;
+            const cx = w / 2; const cy = h - 10; const radius = 70;
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
+            ctx.lineWidth = 12; ctx.strokeStyle = '#202024'; ctx.stroke();
+
+            const pct = Math.min(Math.max((val - minVal) / (maxVal - minVal), 0), 1);
+            const angle = Math.PI + (pct * Math.PI);
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, Math.PI, angle);
+            ctx.lineWidth = 12; ctx.strokeStyle = color; ctx.stroke();
+        }
+
+        function updateStatus(isConnected, text) {
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('statusText');
+            const badge = document.getElementById('statusBadge');
+            const btn = document.getElementById('btnConnect');
+
+            txt.innerText = text;
+            if (isConnected) {
+                badge.className = "status-badge connected";
+                if (btn) {
+                    btn.innerText = "Desconectar";
+                    btn.className = "btn btn-rose";
+                    btn.style.flex = "1";
+                }
+            } else {
+                badge.className = "status-badge";
+                if (btn) {
+                    btn.innerText = "Conectar Serial";
+                    btn.className = "btn btn-green";
+                    btn.style.flex = "1";
+                }
+            }
+        }
+
+        let simInterval = null;
+        function toggleSimulation() {
+            isSimulating = !isSimulating;
+            const btn = document.getElementById('btnSim');
+            if (isSimulating) {
+                stopRequestLoop();
+                if (btn) {
+                    btn.innerText = "Parar Simulação";
+                    btn.className = "btn btn-rose";
+                }
+                log("Modo de simulação ativado.", 'tx');
+                simInterval = setInterval(() => {
+                    updateDashboard({
+                        rpm: Math.floor(800 + Math.random() * 5500),
+                        map: Math.floor(30 + Math.random() * 120),
+                        tps: Math.floor(Math.random() * 100),
+                        clt: 88, afr: 14.7, bat: 13.8,
+                        advance: 18.0, pw: 2.45, iat: 32
+                    });
+                    
+                    currentRPM = parseInt(document.getElementById('valRPM').innerText) || 1000;
+                    currentMAP = parseInt(document.getElementById('valMAP').innerText) || 50;
+                    const viewTabelaVE = document.getElementById('viewTabelaVE');
+                    if (viewTabelaVE && !viewTabelaVE.classList.contains('hidden')) {
+                        renderizarGridVE(paginaAtivaAtual, tableNameAtual);
+                    }
+
+                    const elHz = document.getElementById('valHz');
+                    if(elHz) elHz.innerText = Math.floor(45 + Math.random() * 5);
+                }, 100);
+            } else {
+                if (btn) {
+                    btn.innerText = "Simular Dados";
+                    btn.className = "btn btn-purple";
+                }
+                clearInterval(simInterval);
+                log("Modo de simulação desativado.", 'err');
+                if (port) startRequestLoop();
+            }
+        }
+
+        switchTab('connect');
+        drawGauge('gaugeRPM', 0, 0, 8000, '#04d361');
+        drawGauge('gaugeMAP', 0, 0, 250, '#8257e5');
+    </script>
+</body>
+</html>
